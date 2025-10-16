@@ -101,7 +101,7 @@ It works anywhere on your site using a simple `[telegram_chat]` shortcode.
 ## 🧑‍💻 Author
 
 **Rothika / VISETH HUL**
-🌐 [website-hosting.info](https://website-hosting.info)
+🌐 [website-hosting](https://hostinger22.duoservers.com/)
 📞 Telegram: [@hulviseth](https://t.me/hulviseth)
 
 ---
