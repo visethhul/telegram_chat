@@ -37,48 +37,25 @@ It works anywhere on your site using a simple `[telegram_chat]` shortcode.
 
 ---
 
-## 🧠 Shortcode Usage
+Notes, behavior & tips
 
-### 🔹 Basic
+The plugin uses the tg://resolve?domain=USERNAME&text=... scheme which opens the Telegram app on mobile. If the app is not installed or the scheme fails, a fallback to https://t.me/USERNAME?text=... is used.
 
-```plaintext
-[telegram_chat]
-```
+The button looks like a normal link (no 3rd-party CSS). You can add your own classes via the class attribute in the shortcode and style it with theme CSS if desired.
 
-### 🔹 With custom message
+The message is URL-encoded on output to avoid breaking links.
 
-```plaintext
-[telegram_chat text="Hi, I am interested in your services!"]
-```
+The admin page is optional — you can set defaults there and override via shortcode attributes.
 
-### 🔹 With custom username, label, and colors
+No external JavaScript libraries, no external CSS, no requests to third-party servers — fully local and lightweight.
 
-```plaintext
-[telegram_chat 
-  user="hulviseth" 
-  text="Hello there!" 
-  label="Chat with us on Telegram" 
-  color="#00aaff" 
-  textcolor="#ffffff"]
-```
+Examples
 
----
+Basic: [telegram_chat username="acme_support" label="Chat" message="Hi, I want help"]
 
-## 🧩 Parameters
+With colors: [telegram_chat username="myname" label="Chat on Telegram" btn_color="#2AABEE" text_color="#fff" message="Hello there"]
 
-| Attribute   | Default Value          | Description                          |
-| ----------- | ---------------------- | ------------------------------------ |
-| `user`      | `hulviseth`            | Your Telegram username (without `@`) |
-| `text`      | `Hello`                | Message text pre-filled in the chat  |
-| `label`     | `💬 Chat via Telegram` | Text displayed on the button         |
-| `color`     | `#0088cc`              | Button background color              |
-| `textcolor` | `#ffffff`              | Button text color                    |
-
----
-
-## 💬 Example Output
-
-> 💬 **Chat via Telegram** — a blue rounded button that opens Telegram directly on mobile or in a new browser tab on desktop.
+Extra class/id: [telegram_chat username="myname" label="Support" class="my-chat-btn" id="chat-top"]
 
 ---
 
