@@ -1,0 +1,256 @@
+<?php
+/*
+Plugin Name: Telegram Chat Button (Lightweight)
+Plugin URI:  https://example.com
+Description: Adds a lightweight shortcode/button to open Telegram (mobile app when available) with custom username, message, label and colors. No external dependencies.
+Version:     1.0
+Author:      Your Name
+Text Domain: telegram-chat-button
+*/
+
+if ( ! defined( 'ABSPATH' ) ) {
+    exit;
+}
+
+class TCB_Telegram_Button {
+
+    const OPTION_KEY = 'tcb_telegram_defaults';
+
+    public function __construct() {
+        add_action( 'init', array( $this, 'register_shortcode' ) );
+        add_action( 'admin_menu', array( $this, 'admin_menu' ) );
+        add_action( 'admin_init', array( $this, 'register_settings' ) );
+        add_action( 'wp_footer', array( $this, 'print_inline_script' ) );
+        add_action( 'wp_enqueue_scripts', array( $this, 'maybe_enqueue_styles' ) );
+    }
+
+    public function register_shortcode() {
+        add_shortcode( 'telegram_chat', array( $this, 'shortcode_handler' ) );
+    }
+
+    private function get_defaults() {
+        $defaults = array(
+            'username'  => '',
+            'message'   => '',
+            'label'     => 'Chat on Telegram',
+            'btn_color' => '#1CA3E0',
+            'text_color'=> '#ffffff',
+            'new_tab'   => '1', // open fallback in new tab on desktop
+        );
+        $opts = get_option( self::OPTION_KEY, array() );
+        return wp_parse_args( $opts, $defaults );
+    }
+
+    public function shortcode_handler( $atts ) {
+        $defaults = $this->get_defaults();
+
+        $atts = shortcode_atts( array(
+            'username'   => $defaults['username'],
+            'message'    => $defaults['message'],
+            'label'      => $defaults['label'],
+            'btn_color'  => $defaults['btn_color'],
+            'text_color' => $defaults['text_color'],
+            'new_tab'    => $defaults['new_tab'],
+            'class'      => '', // extra css classes
+            'id'         => '', // optional id
+        ), $atts, 'telegram_chat' );
+
+        // sanitize
+        $username = trim( sanitize_text_field( $atts['username'] ) );
+        if ( substr( $username, 0, 1 ) === '@' ) {
+            $username = substr( $username, 1 );
+        }
+        if ( empty( $username ) ) {
+            return '<!-- telegram_chat: no username provided -->';
+        }
+
+        $label = sanitize_text_field( $atts['label'] );
+        $message = sanitize_text_field( $atts['message'] );
+        $btn_color = sanitize_hex_color( $atts['btn_color'] ) ?: '#1CA3E0';
+        $text_color = sanitize_hex_color( $atts['text_color'] ) ?: '#ffffff';
+        $open_new_tab = in_array( $atts['new_tab'], array( '1', '0', 'true', 'false' ), true ) ? ( $atts['new_tab'] == '1' || strtolower($atts['new_tab']) === 'true' ) : true;
+        $extra_class = sanitize_html_class( $atts['class'] );
+        $element_id = $atts['id'] ? esc_attr( $atts['id'] ) : 'tcb-btn-' . wp_generate_password( 6, false, false );
+
+        // data attributes for JS
+        $data = array(
+            'username' => esc_attr( $username ),
+            'message'  => rawurlencode( $message ),
+            'label'    => esc_html( $label ),
+            'btn_color'=> esc_attr( $btn_color ),
+            'text_color'=> esc_attr( $text_color ),
+            'new_tab'  => $open_new_tab ? '1' : '0',
+        );
+
+        // inline style for button (simple)
+        $style = sprintf( 'style="background:%s;color:%s;border:none;padding:.55rem 1rem;border-radius:6px;cursor:pointer;font-size:1rem;line-height:1.1;text-decoration:none;display:inline-block;"', esc_attr( $btn_color ), esc_attr( $text_color ) );
+
+        $html = sprintf(
+            '<a href="%1$s" id="%2$s" class="tcb-telegram-btn %3$s" %4$s data-username="%5$s" data-message="%6$s" data-newtab="%7$s" aria-label="%8$s">%9$s</a>',
+            esc_url( 'https://t.me/' . $username . '?text=' . rawurlencode( $message ) ), // sensible fallback href
+            $element_id,
+            $extra_class,
+            $style,
+            $data['username'],
+            $data['message'],
+            $data['new_tab'],
+            esc_attr( $label ),
+            esc_html( $label )
+        );
+
+        return $html;
+    }
+
+    public function maybe_enqueue_styles() {
+        // small, inline CSS class definitions – keep everything lightweight
+        $css = "
+        .tcb-telegram-btn:focus{outline:2px solid rgba(0,0,0,.12);outline-offset:2px}
+        ";
+        wp_add_inline_style( 'wp-block-library', $css ); // rely on core style handle to inject minimal CSS
+    }
+
+    public function print_inline_script() {
+        // Print a tiny JS snippet only once in footer
+        static $printed = false;
+        if ( $printed ) {
+            return;
+        }
+        $printed = true;
+
+        // The script detects mobile, builds tg:// and https:// links, tries scheme on mobile, and falls back.
+        ?>
+        <script>
+        (function(){
+            function isMobile(){ return /Android|iPhone|iPad|iPod|Windows Phone|webOS/i.test(navigator.userAgent); }
+            function openTelegram(username, message, openNewTab){
+                message = message || '';
+                var encoded = message; // already rawurlencoded on server side for safety; but decode/encode again to be safe
+                try { encoded = encodeURIComponent(decodeURIComponent(message)); } catch(e){ encoded = encodeURIComponent(message); }
+
+                var tgLink = 'tg://resolve?domain=' + username + '&text=' + encoded;
+                var webLink = 'https://t.me/' + username + '?text=' + encoded;
+
+                if ( isMobile() ) {
+                    // attempt scheme; fallback to web after short delay
+                    window.location = tgLink;
+                    setTimeout(function(){
+                        // If app didn't open, redirect to web version
+                        if(openNewTab === '1'){
+                            window.open(webLink, '_blank');
+                        } else {
+                            window.location = webLink;
+                        }
+                    }, 700);
+                } else {
+                    // Desktop: open t.me (web) — optionally new tab
+                    if(openNewTab === '1'){
+                        window.open(webLink, '_blank');
+                    } else {
+                        window.location = webLink;
+                    }
+                }
+            }
+
+            // Attach handler to .tcb-telegram-btn elements
+            document.addEventListener('click', function(e){
+                var el = e.target;
+                // walk up to handle clicks on children
+                while(el && el !== document){
+                    if(el.classList && el.classList.contains('tcb-telegram-btn')){
+                        e.preventDefault();
+                        var username = el.getAttribute('data-username') || '';
+                        var message = el.getAttribute('data-message') || '';
+                        var openNewTab = el.getAttribute('data-newtab') || '1';
+                        if(username){
+                            openTelegram(username, message, openNewTab);
+                        }
+                        return;
+                    }
+                    el = el.parentNode;
+                }
+            }, false);
+        })();
+        </script>
+        <?php
+    }
+
+    // Admin settings
+    public function admin_menu() {
+        add_options_page( 'Telegram Chat Button', 'Telegram Chat Button', 'manage_options', 'tcb-telegram', array( $this, 'settings_page' ) );
+    }
+
+    public function register_settings() {
+        register_setting( 'tcb_telegram_group', self::OPTION_KEY, array( $this, 'sanitize_options' ) );
+        add_settings_section( 'tcb_main', 'Default Shortcode Values', null, 'tcb-telegram' );
+        add_settings_field( 'username', 'Telegram Username', array( $this, 'field_username' ), 'tcb-telegram', 'tcb_main' );
+        add_settings_field( 'message', 'Default Message', array( $this, 'field_message' ), 'tcb-telegram', 'tcb_main' );
+        add_settings_field( 'label', 'Default Button Label', array( $this, 'field_label' ), 'tcb-telegram', 'tcb_main' );
+        add_settings_field( 'btn_color', 'Button Color', array( $this, 'field_btn_color' ), 'tcb-telegram', 'tcb_main' );
+        add_settings_field( 'text_color', 'Text Color', array( $this, 'field_text_color' ), 'tcb-telegram', 'tcb_main' );
+        add_settings_field( 'new_tab', 'Open fallback in new tab (desktop)?', array( $this, 'field_new_tab' ), 'tcb-telegram', 'tcb_main' );
+    }
+
+    public function sanitize_options( $input ) {
+        $o = array();
+        $o['username'] = isset($input['username']) ? sanitize_text_field( $input['username'] ) : '';
+        if ( substr( $o['username'], 0, 1 ) === '@' ) { $o['username'] = substr( $o['username'], 1 ); }
+        $o['message']  = isset($input['message']) ? sanitize_text_field( $input['message'] ) : '';
+        $o['label']    = isset($input['label']) ? sanitize_text_field( $input['label'] ) : 'Chat on Telegram';
+        $o['btn_color'] = sanitize_hex_color( $input['btn_color'] ) ?: '#1CA3E0';
+        $o['text_color']= sanitize_hex_color( $input['text_color'] ) ?: '#ffffff';
+        $o['new_tab']   = ( isset($input['new_tab']) && ( $input['new_tab'] == '1' || $input['new_tab'] == '0' ) ) ? $input['new_tab'] : '1';
+        return $o;
+    }
+
+    public function field_username() {
+        $v = $this->get_defaults();
+        printf( '<input type="text" name="%s[username]" value="%s" class="regular-text" placeholder="telegramusername" />', esc_attr( self::OPTION_KEY ), esc_attr( $v['username'] ) );
+        echo '<p class="description">Enter username only (without @). Example: <code>myusername</code></p>';
+    }
+
+    public function field_message() {
+        $v = $this->get_defaults();
+        printf( '<input type="text" name="%s[message]" value="%s" class="regular-text" placeholder="Hi, I want to contact you" />', esc_attr( self::OPTION_KEY ), esc_attr( $v['message'] ) );
+    }
+
+    public function field_label() {
+        $v = $this->get_defaults();
+        printf( '<input type="text" name="%s[label]" value="%s" class="regular-text" />', esc_attr( self::OPTION_KEY ), esc_attr( $v['label'] ) );
+    }
+
+    public function field_btn_color() {
+        $v = $this->get_defaults();
+        printf( '<input type="text" name="%s[btn_color]" value="%s" class="regular-text" placeholder="#1CA3E0" />', esc_attr( self::OPTION_KEY ), esc_attr( $v['btn_color'] ) );
+        echo '<p class="description">Hex color (example: #1CA3E0)</p>';
+    }
+
+    public function field_text_color() {
+        $v = $this->get_defaults();
+        printf( '<input type="text" name="%s[text_color]" value="%s" class="regular-text" placeholder="#ffffff" />', esc_attr( self::OPTION_KEY ), esc_attr( $v['text_color'] ) );
+    }
+
+    public function field_new_tab() {
+        $v = $this->get_defaults();
+        $checked = $v['new_tab'] === '1' ? 'checked' : '';
+        printf( '<label><input type="checkbox" name="%s[new_tab]" value="1" %s /> Open fallback link in a new tab (desktop)</label>', esc_attr( self::OPTION_KEY ), $checked );
+    }
+
+    public function settings_page() {
+        ?>
+        <div class="wrap">
+            <h1>Telegram Chat Button — Defaults</h1>
+            <form method="post" action="options.php">
+                <?php settings_fields( 'tcb_telegram_group' ); ?>
+                <?php do_settings_sections( 'tcb-telegram' ); ?>
+                <?php submit_button(); ?>
+            </form>
+            <h2>Shortcode usage</h2>
+            <p>Shortcode attributes override settings. Examples:</p>
+            <pre>[telegram_chat username="myusername" message="Hello! I want info" label="Contact" btn_color="#1CA3E0" text_color="#fff"]</pre>
+            <p>If you leave attributes out, the plugin will use the defaults above.</p>
+        </div>
+        <?php
+    }
+}
+
+new TCB_Telegram_Button();
