@@ -1,10 +1,3 @@
-Perfect 👌 Let’s make your **GitHub `README.md`** fully professional — complete with **badges**, **code highlighting**, and **plugin support links**.
-
-Here’s the **ready-to-use, GitHub-optimized version** (just copy into your `README.md` file inside your plugin folder).
-
----
-
-````markdown
 # 💬 Telegram Chat Button – WordPress Plugin
 
 ---
@@ -30,7 +23,7 @@ It works anywhere on your site using a simple `[telegram_chat]` shortcode.
 
 1. Download or clone this repository:
    ```bash
-   git clone https://github.com/yourusername/telegram_chat.git
+   git clone https://github.com/hulviseth/telegram_chat.git
 ````
 
 2. Upload the folder to your WordPress installation:
@@ -100,9 +93,8 @@ It works anywhere on your site using a simple `[telegram_chat]` shortcode.
 
 ## 🧑‍💻 Author
 
-**Rothika / VISETH HUL**
-🌐 [website-hosting](https://hostinger22.duoservers.com/)
-📞 Telegram: [@hulviseth](https://t.me/hulviseth)
+**R VISETH HUL**
+🌐 [howting I like ](https://hostinger22.duoservers.com/)
 
 ---
 
@@ -113,13 +105,6 @@ You are free to modify and redistribute it under the same license.
 
 ---
 
-## ⭐ Support the Project
-
-If you find this plugin useful:
-
-* Give it a ⭐ on [GitHub](https://github.com/visethhul/telegram_chat)
-* Share it with other WordPress developers
-* Contribute improvements or translations via Pull Requests
 
 ---
 
